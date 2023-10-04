@@ -71,9 +71,7 @@ int main(int argc, char *argv[]) {
 
     // Bind
     struct sockaddr *addr = (struct sockaddr *)(&storage);
-    printf("%d", bind(s, addr, sizeof(storage)));
     if(bind(s, addr, sizeof(storage)) != 0){
-        printf("\nATE AQUI\n");
         logexit("bind");
     }
 
