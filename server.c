@@ -1,31 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "common.h"
 
-struct action{
-    int type;
-    int coordinates[2];
-    int board[4][4];
-};
 int intitial_matrix[4][4];
-
-//print da matriz inicial
-void print_matrix(int matrix[4][4]){
-    for(int i=0; i < 4; i++){
-        for(int j=0; j < 4; j++){
-            if(matrix[i][j]== -1)
-                printf("*\t\t");
-            else if (matrix[i][j]== -2)
-            {
-                printf("-\t\t");
-            }
-            else{
-                printf("%d\t\t", matrix[i][j]);
-            }
-        }
-        printf("\n");
-    }
-}
 
 //função que inicia a matriz
 struct action start_matrix(struct action action){
@@ -35,82 +10,30 @@ struct action start_matrix(struct action action){
             //printf("%d\t\t",action->board[i][j]);
         }
     }
+    action.coordinates[0]= 0;
+    action.coordinates[1]= 0;
     return action;
 }
 
-//função que atualiza a matriz
-struct action update_matrix(struct action action){
-    int x = action.coordinates[0];
-    int y = action.coordinates[1];
-    if(action.type == 0){
-        action = start_matrix(action);
-        print_matrix(action.board);
-        return action;
-    }
-    else if(action.type == 1){
-        if(intitial_matrix[x][y] == -1){
-            printf("GAME OVER!");
-            print_matrix(intitial_matrix);
-            return action;
-        }
-        else if(intitial_matrix[x][y] == -2){
-            action.board[x][y] = -2;
-            print_matrix(action.board);
-            return action;
-        }
-        else{
-            action.board[x][y] = intitial_matrix[x][y];
-            print_matrix(action.board);
-            return action;
+//função que verifica se o jogador ganhou comparando o board dele com o board resposta
+bool win(struct action action){
+    for(int i=0; i < 4; i++){
+        for(int j=0; j < 4; j++){
+            if(!(action.board[i][j] == intitial_matrix[i][j])){
+                //se for bomba vai ser diferente
+                if(intitial_matrix[i][j] != -1){
+                    return false;
+                }
+            }
         }
     }
-    else if(action.type == 2){
-        action.board[x][y] = -3;
-        print_matrix(action.board);
-        return action;
-    }
-    // else if(action.type == 3){
-    //     action.board[x][y] = -2;
-    //     print_matrix(action.board);
-    //     return action;
-    // }
-    else if(action.type == 4){
-        action.board[x][y] = -2;
-        print_matrix(action.board);
-        return action;
-    }
-    else if(action.type == 5){
-        restart_game();
-        return action;
-    }
-    else if(action.type == 6){
-        action.board[x][y] = -5;
-        print_matrix(action.board);
-        return action;
-    }
-    else if(action.type == 7){
-        printf("client disconnected");
-        exit;
-    }
-    else if(action.type == 8){
-        printf("GAME OVER!");
-        return action;
-    }
-    else{
-        printf("error: command not found\n");
-        return action;
-    }   
-    
+    return true;
 }
-
 
 
 int main(int argc, char *argv[]) {
     char* protocol = argv[1];
     char* gate = argv[2];
-    // printf("%s\n", protocol);
-    // printf("%s\n", gate);
-
     if(strcmp(argv[3], "-i") == 0){
         FILE *fp;
         fp = fopen(argv[4], "r");
@@ -124,23 +47,111 @@ int main(int argc, char *argv[]) {
         fclose(fp);
         print_matrix(intitial_matrix);
     }
-    printf("\n");
+    else{
+        exit(1);
+    }
 
-    struct action action;
-    action.type = 0;
-    action.coordinates[0] = 0;
-    action.coordinates[1] = 0;
-    //start_matrix(&action);
-    action = update_matrix(action);
+    struct sockaddr_storage storage;
 
+    if(server_sockaddr_init(protocol, gate, &storage)){
+        logexit("server_sockaddr_init");
+    }
 
-    
-    //    printf("%d %d\n", action.coordinates[1], action.coordinates[2]);
-    // for(int i=0; i < 4; i++){
-    //     for(int j=0; j < 4; j++){
-    //         printf("%d", action.board[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    // Socket
+    int s = socket(storage.ss_family, SOCK_STREAM, 0);
+    if(s == -1){
+        logexit("socket");
+    }
+
+    // Reuse
+    int enable = 1;
+    if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) != 0){
+        logexit("setsockopt");
+    }
+
+    // Bind
+    struct sockaddr *addr = (struct sockaddr *)(&storage);
+    printf("%d", bind(s, addr, sizeof(storage)));
+    if(bind(s, addr, sizeof(storage)) != 0){
+        printf("\nATE AQUI\n");
+        logexit("bind");
+    }
+
+    // Listen
+    if(listen(s, 10) != 0){
+        logexit("listen");
+    }
+    struct sockaddr_storage cstorage;
+    struct sockaddr *caddr = (struct sockaddr *) &cstorage;
+    socklen_t caddrlen = sizeof(cstorage);
+
+    //while client is connected
+    while(1){
+        int csock = accept(s, caddr, &caddrlen);
+        printf("client connected\n");
+        if (csock == -1) {
+            logexit("accept");
+        }
+        while (1){
+            struct action req;
+            memset(&req, 0, sizeof(req));
+            ssize_t count = recv(csock, &req, sizeof(req), 0);
+            if (count == 0) {
+                break;
+            }
+            else if (count != sizeof(req)) {
+                logexit("recv");
+            }
+
+            struct action resp;
+            //start
+            if(req.type == 0){
+                resp = start_matrix(req);
+            }
+            //reveal
+            else if(req.type == 1){
+                resp.board[req.coordinates[0]][req.coordinates[1]] = intitial_matrix[req.coordinates[0]][req.coordinates[1]];
+                //bomb
+                if(intitial_matrix[req.coordinates[0]][req.coordinates[1]] == -1){
+                    resp.board[req.coordinates[0]][req.coordinates[1]] = -1;
+                    resp.type = 8;
+                }
+                //ganhou
+                else if(win(resp))
+                    resp.type = 6;
+                //state
+                else
+                    resp.type = 3;
+            }
+            //flag
+            else if(req.type == 2){
+                resp.board[req.coordinates[0]][req.coordinates[1]] = -3;
+                resp.type = 3;
+            }
+            //remove flag
+            else if(req.type == 4){
+                resp.board[req.coordinates[0]][req.coordinates[1]] = -2;
+                resp.type = 3;
+            }
+            //reset
+            else if(req.type == 5){
+                start_matrix(req);
+                printf("starting new game");
+                resp.type = 3;
+            }
+            else if(req.type == 7){
+                start_matrix(req);
+                printf("client disconnected\n");
+                continue;
+            }
+
+            //verifica oq é pra fazer com a response
+       
+            if (send(csock, &resp, sizeof(resp), 0) != sizeof(resp)) {
+                logexit("send");
+            }
+        }
+        close(csock);
+    }
     return 0;
 }
