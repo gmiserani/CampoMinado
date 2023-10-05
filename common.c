@@ -1,6 +1,6 @@
 #include "common.h"
 
-//print da matriz inicial
+//print a matriz passada como parametro (board)
 void print_matrix(int matrix[4][4]){
     for(int i=0; i < 4; i++){
         for(int j=0; j < 4; j++){
@@ -10,6 +10,8 @@ void print_matrix(int matrix[4][4]){
             {
                 printf("-\t\t");
             }
+            else if(matrix[i][j]== -3)
+                printf(">\t\t");
             else{
                 printf("%d\t\t", matrix[i][j]);
             }

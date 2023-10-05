@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-
+//struct que representa uma ação do jogador
 struct action{
     int type;
     int coordinates[2];

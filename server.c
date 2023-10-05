@@ -1,13 +1,13 @@
 #include "common.h"
 
 int intitial_matrix[4][4];
+int current_matrix[4][4];
 
 //função que inicia a matriz
 struct action start_matrix(struct action action){
     for(int i=0; i < 4; i++){
         for(int j=0; j < 4; j++){
             action.board[i][j] = -2;
-            //printf("%d\t\t",action->board[i][j]);
         }
     }
     action.coordinates[0]= 0;
@@ -20,7 +20,7 @@ bool win(struct action action){
     for(int i=0; i < 4; i++){
         for(int j=0; j < 4; j++){
             if(!(action.board[i][j] == intitial_matrix[i][j])){
-                //se for bomba vai ser diferente
+                //se for bomba vai ser diferente da matriz resposta
                 if(intitial_matrix[i][j] != -1){
                     return false;
                 }
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr *caddr = (struct sockaddr *) &cstorage;
     socklen_t caddrlen = sizeof(cstorage);
 
-    //while client is connected
+    // Accept
     while(1){
         int csock = accept(s, caddr, &caddrlen);
         printf("client connected\n");
@@ -111,12 +111,22 @@ int main(int argc, char *argv[]) {
                 resp.board[req.coordinates[0]][req.coordinates[1]] = intitial_matrix[req.coordinates[0]][req.coordinates[1]];
                 //bomb
                 if(intitial_matrix[req.coordinates[0]][req.coordinates[1]] == -1){
-                    resp.board[req.coordinates[0]][req.coordinates[1]] = -1;
                     resp.type = 8;
+                    for(int i = 0; i < 4; i++){
+                        for(int j = 0; j < 4; j++){
+                            resp.board[i][j] = intitial_matrix[i][j];
+                        }
+                    }
                 }
-                //ganhou
-                else if(win(resp))
+                //win
+                else if(win(resp)){
                     resp.type = 6;
+                    for(int i = 0; i < 4; i++){
+                        for(int j = 0; j < 4; j++){
+                            resp.board[i][j] = intitial_matrix[i][j];
+                        }
+                    }
+                }
                 //state
                 else
                     resp.type = 3;
@@ -133,18 +143,24 @@ int main(int argc, char *argv[]) {
             }
             //reset
             else if(req.type == 5){
-                start_matrix(req);
-                printf("starting new game");
+                resp = start_matrix(req);
+                printf("starting new game\n");
                 resp.type = 3;
             }
+            //exit
             else if(req.type == 7){
-                start_matrix(req);
+                resp = start_matrix(req);
                 printf("client disconnected\n");
-                continue;
             }
 
-            //verifica oq é pra fazer com a response
-       
+            //atualiza a matriz de estado atual
+            for(int i =0; i<4; i++){
+                for(int j =0; j<4; j++){
+                    current_matrix[i][j] = resp.board[i][j];
+                }
+            }
+
+            //envia a resposta para o cliente
             if (send(csock, &resp, sizeof(resp), 0) != sizeof(resp)) {
                 logexit("send");
             }
