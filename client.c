@@ -33,6 +33,13 @@ int main(int argc, char **argv){
             req.type = 0;
             gameStarted = true;
         }
+        else if(strcmp(input, "reset") == 0){
+                req.type = 5;
+                gameStarted = true;
+            }
+        else if(strcmp(input, "exit") == 0){
+            req.type = 7;
+        }
         else if(gameStarted){
             if(strcmp(input, "reveal") == 0){
                 req.type = 1;
@@ -87,12 +94,6 @@ int main(int argc, char **argv){
                     _send = false;
                     continue;
                 }
-            }
-            else if(strcmp(input, "reset") == 0){
-                req.type = 5;
-            }
-            else if(strcmp(input, "exit") == 0){
-                req.type = 7;
             }
             else{
                 printf("error: command not found\n");
